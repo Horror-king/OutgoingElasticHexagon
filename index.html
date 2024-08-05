@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Voice Recorder</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            background-image: url('1722879179921.jpg');
+            background-size: cover;
+            background-position: center;
+            color: #ffffff;
+        }
+
+        .container {
+            text-align: center;
+            background: rgba(0, 0, 0, 0.8);
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
+        }
+
+        button {
+            margin: 10px;
+            padding: 10px 20px;
+            font-size: 10px;
+            background: #007BFF;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background 0.3s ease;
+        }
+
+        button:hover {
+            background: #0056b3;
+        }
+
+        ul {
+            list-style: none;
+            padding: 0;
+        }
+
+        li {
+            margin-top: 10px;
+        }
+
+        .menu {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+        }
+
+        .menu-icon {
+            cursor: pointer;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-around;
+            height: 24px;
+        }
+
+        .menu-icon div {
+            width: 30px;
+            height: 4px;
+            background-color: #333;
+        }
+
+        .nav {
+            display: none;
+            flex-direction: column;
+            position: absolute;
+            top: 70px;
+            right: 20px;
+            background: rgba(255, 255, 255, 0.9);
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        }
+
+        .nav a {
+            padding: 9px 19px;
+            text-decoration: none;
+            color: #333;
+            border-bottom: 1px solid #ccc;
+        }
+
+        .nav a:last-child {
+            border-bottom: none;
+        }
+
+        .back-button {
+            display: none;
+            margin-top: 20px;
+        }
+
+        .volume-meter {
+            width: 100%;
+            height: 10px;
+            background: lightgray;
+            border-radius: 5px;
+            margin-top: 10px;
+        }
+
+        .volume-meter-fill {
+            height: 100%;
+            background: green;
+            width: 0;
+            border-radius: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="menu">
+        <div class="menu-icon" id="menuIcon">
+            <div></div>
+            <div></div>
+            <div></div>
+        </div>
+        <div class="nav" id="navMenu">
+            <a href="#" onclick="showSection('home')">Home</a>
+            <a href="#" onclick="showSection('about')">About</a>
+            <a href="#" onclick="showSection('contact')">Contact</a>
+            <a href="#" onclick="showSection('projects')">My Projects</a>
+            <a href="#" onclick="showSection('settings')">Settings</a>
+        </div>
+    </div>
+
+    <div class="container" id="home">
+        <h1>Welcome to the Voice Recorder App</h1>
+        <p>This app allows you to record your voice, save recordings, and manage your audio files easily.</p>
+        <button id="recordButton">Start Recording</button>
+        <button id="pauseButton" disabled>Pause Recording</button>
+        <button id="resumeButton" disabled>Resume Recording</button>
+        <button id="stopButton" disabled>Stop Recording</button>
+        <div class="volume-meter">
+            <div class="volume-meter-fill" id="volumeMeter"></div>
+        </div>
+        <ul id="recordingsList"></ul>
+    </div>
+
+    <div class="container" id="about" style="display:none;">
+        <h1>About</h1>
+        <p>This Voice Recorder app is developed to help you capture important moments and ideas effortlessly.</p>
+        <button class="back-button" onclick="showSection('home')">Back</button>
+    </div>
+
+    <div class="container" id="contact" style="display:none;">
+        <h1>Contact</h1>
+        <p>For any inquiries, please contact us at support, hassanadvice9@gmail.com</p>
+        <button class="back-button" onclick="showSection('home')">Back</button>
+    </div>
+
+    <div class="container" id="projects" style="display:none;">
+        <h1>My Projects</h1>
+        <p>Explore my other projects and see what else I've been working on.</p>
+        <button class="back-button" onclick="showSection('home')">Back</button>
+    </div>
+
+    <div class="container" id="settings" style="display:none;">
+        <h1>Settings</h1>
+        <p>Adjust the recording quality and format here.</p>
+        <label for="quality">Quality:</label>
+        <select id="quality">
+            <option value="high">High</option>
+            <option value="medium">Medium</option>
+            <option value="low">Low</option>
+        </select>
+        <button class="back-button" onclick="showSection('home')">Back</button>
+    </div>
+
+    <script>
+        let chunks = [];
+        let recorder;
+        let audioStream;
+        let audioContext;
+        let analyser;
+        let volumeMeter;
+
+        const recordButton = document.getElementById('recordButton');
+        const pauseButton = document.getElementById('pauseButton');
+        const resumeButton = document.getElementById('resumeButton');
+        const stopButton = document.getElementById('stopButton');
+        const recordingsList = document.getElementById('recordingsList');
+        const volumeMeterFill = document.getElementById('volumeMeter');
+
+        recordButton.addEventListener('click', startRecording);
+        pauseButton.addEventListener('click', pauseRecording);
+        resumeButton.addEventListener('click', resumeRecording);
+        stopButton.addEventListener('click', stopRecording);
+
+        async function startRecording() {
+            audioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            recorder = new MediaRecorder(audioStream);
+
+            audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            const source = audioContext.createMediaStreamSource(audioStream);
+            analyser = audioContext.createAnalyser();
+            source.connect(analyser);
+
+            recorder.ondataavailable = (e) => {
+                chunks.push(e.data);
+            };
+
+            recorder.onstop = processRecording;
+
+            recorder.start();
+            recordButton.disabled = true;
+            pauseButton.disabled = false;
+            stopButton.disabled = false;
+            updateVolumeMeter();
+        }
+
+        function pauseRecording() {
+            recorder.pause();
+            pauseButton.disabled = true;
+            resumeButton.disabled = false;
+        }
+
+        function resumeRecording() {
+            recorder.resume();
+            pauseButton.disabled = false;
+            resumeButton.disabled = true;
+        }
+
+        function stopRecording() {
+            recorder.stop();
+            audioStream.getTracks().forEach(track => track.stop());
+            recordButton.disabled = false;
+            pauseButton.disabled = true;
+            resumeButton.disabled = true;
+            stopButton.disabled = true;
+        }
+
+        async function processRecording() {
+            const blob = new Blob(chunks, { type: 'audio/wav' });
+            chunks = [];
+
+            const processedBlob = await processAudio(blob);
+
+            const url = URL.createObjectURL(processedBlob);
+            const li = document.createElement('li');
+            const audio = document.createElement('audio');
+            const anchor = document.createElement('a');
+
+            audio.controls = true;
+            audio.src = url;
+            anchor.href = url;
+            anchor.download = `recording_${new Date().toISOString()}.wav`;
+            anchor.textContent = 'Download';
+
+            li.appendChild(audio);
+            li.appendChild(anchor);
+            recordingsList.appendChild(li);
+        }
+
+        async function processAudio(blob) {
+            return blob; // Placeholder for actual audio processing
+        }
+
+        function updateVolumeMeter() {
+            const dataArray = new Uint8Array(analyser.frequencyBinCount);
+            analyser.getByteTimeDomainData(dataArray);
+            const rms = Math.sqrt(dataArray.reduce((sum, value) => sum + value ** 2, 0) / dataArray.length);
+            volumeMeterFill.style.width = (rms / 128) * 100 + '%';
+            if (recorder && recorder.state === 'recording') {
+                requestAnimationFrame(updateVolumeMeter);
+            }
+        }
+
+        const menuIcon = document.getElementById('menuIcon');
+        const navMenu = document.getElementById('navMenu');
+
+        menuIcon.addEventListener('click', () => {
+            navMenu.style.display = navMenu.style.display === 'flex' ? 'none' : 'flex';
+        });
+
+        function showSection(sectionId) {
+            document.querySelectorAll('.container').forEach(section => {
+                section.style.display = 'none';
+            });
+            document.getElementById(sectionId).style.display = 'block';
+            if (sectionId !== 'home') {
+                document.querySelector('.back-button').style.display = 'block';
+            }
+        }
+    </script>
+</body>
+</html>
